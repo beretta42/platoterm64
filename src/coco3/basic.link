@@ -1,0 +1,6 @@
+entry start
+section .cmd  load 2000
+section .text
+section .text.startup
+section .data
+section .bss,bss
