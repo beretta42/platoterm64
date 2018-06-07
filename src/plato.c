@@ -21,11 +21,11 @@
 #endif
 #include "coco3.h"
 
-static uint8_t c=0;
-static uint8_t lastc=0;
+static uint8_t modemc=0;
+static uint8_t lastmodemc=0;
 
-static uint8_t CharWide=5;
-static uint8_t CharHigh=6; 
+static uint8_t CharWide=8;
+static uint8_t CharHigh=16; 
 static padBool TouchActive;
 
 static padPt TTYLoc;
@@ -40,23 +40,23 @@ extern padBool Reverse;
 extern DispMode CurMode;
 
 // PLATOTerm for Commodore 64
-const uint8_t welcomemsg_1[]={80,76,65,84,79,84,101,114,109,32,102,111,114,32,67,111,109,109,111,100,111,114,101,32,54,52};
+padByte welcomemsg_1[]={80,76,65,84,79,84,101,114,109,32,102,111,114,32,67,111,109,109,111,100,111,114,101,32,54,52};
 #define WELCOMEMSG_1_LEN 26
 
 // Copyright 2018 IRATA.ONLINE
-const uint8_t welcomemsg_2[]={67,111,112,121,114,105,103,104,116,32,40,99,41,32,0x32,0x30,0x31,0x38,0x20,73,82,65,84,65,46,79,78,76,73,78,69};
+padByte welcomemsg_2[]={67,111,112,121,114,105,103,104,116,32,40,99,41,32,0x32,0x30,0x31,0x38,0x20,73,82,65,84,65,46,79,78,76,73,78,69};
 #define WELCOMEMSG_2_LEN 31
 
 // This software is licensed under GPL 3.0.
-const uint8_t welcomemsg_3[]={84,104,105,115,32,115,111,102,116,119,97,114,101,32,105,115,32,108,105,99,101,110,115,101,100,32,117,110,100,101,114,32,71,80,76,32,51,46,48,32,46};
+padByte welcomemsg_3[]={84,104,105,115,32,115,111,102,116,119,97,114,101,32,105,115,32,108,105,99,101,110,115,101,100,32,117,110,100,101,114,32,71,80,76,32,51,46,48,32,46};
 #define WELCOMEMSG_3_LEN 40
 
 // See COPYING for details.
-const uint8_t welcomemsg_4[]={83,101,101,32,99,111,112,121,105,110,103,32,102,111,114,32,100,101,116,97,105,108,115};
+padByte welcomemsg_4[]={83,101,101,32,99,111,112,121,105,110,103,32,102,111,114,32,100,101,116,97,105,108,115};
 #define WELCOMEMSG_4_LEN 23
 
 // PLATOTerm READY
-const uint8_t welcomemsg_5[]={80,76,65,84,79,84,101,114,109,32,82,69,65,68,89};
+padByte welcomemsg_5[]={80,76,65,84,79,84,101,114,109,32,82,69,65,68,89};
 #define WELCOMEMSG_5_LEN 15
 
 // The static symbol for the c64 swlink driver
@@ -77,10 +77,10 @@ void SetTTY(void)
   CurMode=ModeRewrite;
   tgi_setcolor(TGI_COLOR_WHITE);
   tgi_clear();
-  CharWide=5;
-  CharHigh=6;
+  CharWide=8;
+  CharHigh=16;
   TTYLoc.x = 0;
-  TTYLoc.y = scaley[511]-CharHigh;
+  TTYLoc.y = 368;
 }
 
 /**
@@ -105,7 +105,7 @@ uint8_t TermType(void)
  */
 uint8_t SubType(void)
 {
-  return 1; /* ASCII terminal subtype */
+  return 14; /* ASCII terminal subtype */
 }
 
 /**
@@ -283,17 +283,17 @@ void LineDraw(padPt* Coord1, padPt* Coord2)
 void CharDraw(padPt* Coord, unsigned char* ch, unsigned char count)
 {
   int16_t offset=0; /* due to negative offsets */
-  uint8_t deltaX=CharWide;
-  uint8_t deltaY=CharHigh;
-  uint8_t* chPt=&font[0];
+  uint8_t deltaX=5;
+  uint8_t deltaY=6;
   int16_t x=0;
   int16_t y=0;
-  int8_t i=0; /* current character counter */
-  int8_t j=0; /* vertical loop counter */
-  int8_t k=0; /* horizontal loop counter */
-  int8_t a=0; /* current character byte */
-  int8_t b=0; /* current character row bit */
-  
+  uint8_t i=0; /* current character counter */
+  uint8_t j=0; /* vertical loop counter */
+  uint8_t k=0; /* horizontal loop counter */
+  uint8_t a=0; /* current character byte */
+  uint8_t b=0; /* current character row bit */
+  uint8_t z=0; /* ... */
+    
   switch(CurMem)
     {
     case M0:
@@ -315,29 +315,29 @@ void CharDraw(padPt* Coord, unsigned char* ch, unsigned char count)
       deltaX <<= 1;  // 16 pixels
       deltaY <<= 1; // 32 pixels
     }
-
-  x=scalex[(Coord->x)&0x1FF];
-  y=scaley[(Coord->y+deltaY)&0x1FF];
-
+    
   for (i=0;i<count;++i)
     {
-      chPt=&font[fontptr[*ch]];
+      y=scaley[(Coord->y)&0x1FF];
+      a=*ch++;
+      a=a+offset;
       for (j=0;j<deltaY;++j)
-	{
-	  x=scalex[(x&0x1ff)];
-	  a=*chPt;
-	  for (k=0;k<deltaX;++k)
-	    {
-	      b=a&0x80;
-	      if (c==0x80)
-		tgi_setpixel(x,y);
-	      x++;
-	      b<<=1;
-	    }
-	  y++;
-	}
-      ch++;
+  	{
+  	  b=font[fontptr[a]+j];
+  	  x=scalex[(Coord->x&0x1FF)];
+  	  for (k=0;k<deltaX;++k)
+  	    {
+  	      z=b&0x80;
+  	      if (z==0x80)
+  		tgi_setpixel(x,y);
+  	      x++;
+  	      b<<=1;
+  	    }
+  	  y++;
+  	}
+      Coord->x+=CharWide;
     }
+
 }
 
 /**
@@ -347,7 +347,7 @@ void TTYChar(padByte theChar)
 {
   if ((theChar >= 0x20) && (theChar < 0x7F)) {
     CharDraw(&TTYLoc, &theChar, 1);
-    TTYLoc.x += CharWide;
+    /* TTYLoc.x += CharWide; */
   }
   else if ((theChar == 0x08) && (TTYLoc.x > 7))	/* backspace */
     TTYLoc.x -= CharWide;
@@ -367,6 +367,19 @@ void TTYChar(padByte theChar)
 
 }
 
+/**
+ * greeting(void) - Show terminal greeting
+ */
+void greeting(void)
+{
+  padPt coord;
+  coord.x=168; coord.y=480; CharDraw(&coord,welcomemsg_1,WELCOMEMSG_1_LEN);
+  coord.x=144; coord.y=464; CharDraw(&coord,welcomemsg_2,WELCOMEMSG_2_LEN);
+  coord.x=104; coord.y=432; CharDraw(&coord,welcomemsg_3,WELCOMEMSG_3_LEN);
+  coord.x=160; coord.y=416; CharDraw(&coord,welcomemsg_4,WELCOMEMSG_4_LEN);
+  coord.x=16;  coord.y=384; CharDraw(&coord,welcomemsg_5,WELCOMEMSG_5_LEN);
+}
+
 void main(void)
 {
     /*
@@ -378,12 +391,12 @@ void main(void)
     SER_PAR_NONE,
     SER_HS_HW
   };
+  
+  modemc=ser_install(&c64_swlink);
 
-  c=ser_install(&c64_swlink);
-
-  if (c!=SER_ERR_OK)
+  if (modemc!=SER_ERR_OK)
     {
-      printf("ser_install returned: %d\n",c);
+      printf("ser_install returned: %d\n",modemc);
       return;
     }
 
@@ -402,20 +415,23 @@ void main(void)
   }
 
 
+  SetTTY();
+  greeting();
+  
   // And do the terminal
   for (;;)
     {
-      if (ser_get(&c)==SER_ERR_OK)
+      if (ser_get(&modemc)==SER_ERR_OK)
 	{
 	  // Detect and strip IAC escapes (two consecutive bytes of 0xFF)
-	  if (c==0xFF && lastc == 0xFF)
+	  if (modemc==0xFF && lastmodemc == 0xFF)
 	    {
-	      lastc=0x00;
+	      lastmodemc=0x00;
 	    }
 	  else
 	    {
-	      lastc=c;
-	      ShowPLATO(&c,1);
+	      lastmodemc=modemc;
+	      ShowPLATO(&modemc,1);
 	    }
 	}
       if (kbhit())
