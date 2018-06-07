@@ -1,6 +1,7 @@
 #define _optspeed_
 #define PROTOCOL_DEBUG 1
 
+/*
 #include <6502.h>
 #include <stdio.h>
 #include <tgi.h>
@@ -9,14 +10,16 @@
 #include <serial.h>
 #include <peekpoke.h>
 #include <stdint.h>
+*/
 #include "font.h"
 #include "scale.h"
 #include "protocol.h"
 
 #ifdef PROTOCOL_DEBUG
-#include <cbm.h>
-#include <string.h>
+//#include <cbm.h>
+//#include <string.h>
 #endif
+#include "coco3.h"
 
 static uint8_t c=0;
 static uint8_t lastc=0;
@@ -366,6 +369,7 @@ void TTYChar(padByte theChar)
 
 void main(void)
 {
+    /*
   static const uint8_t pal[2]={TGI_COLOR_BLACK,TGI_COLOR_ORANGE};  
   struct ser_params params = {
     SER_BAUD_19200,
@@ -374,7 +378,7 @@ void main(void)
     SER_PAR_NONE,
     SER_HS_HW
   };
-  
+
   c=ser_install(&c64_swlink);
 
   if (c!=SER_ERR_OK)
@@ -384,13 +388,19 @@ void main(void)
     }
 
   tgi_install(tgi_static_stddrv);
+    */
   tgi_init();
-  install_nmi_trampoline();
+  //install_nmi_trampoline();
   tgi_clear();
-  POKE(0xD020,0);
-  tgi_setpalette(pal);
-  c=ser_open(&params);
-  ser_ioctl(1, NULL);  
+  //POKE(0xD020,0);
+  //tgi_setpalette(pal);
+  ser_open();
+  //ser_ioctl(1, NULL);  
+  char *msg = "tcp connect irata.online 8005\r\n";
+  while(*msg){
+      ser_put_clean(*msg++);
+  }
+
 
   // And do the terminal
   for (;;)
