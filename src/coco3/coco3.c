@@ -6,6 +6,11 @@ extern unsigned int scaley[];
 
 #define screen ((unsigned char *)0x6000)
 
+int debug( int y )
+{
+    return y + 0;
+}
+
 static void ptermDrawPoint(int x, int y)
 {
     tgi_setpixel(scalex[x],scaley[y]);
