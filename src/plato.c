@@ -414,6 +414,8 @@ void main(void)
       ser_put_clean(*msg++);
   }
 
+  PLATOSize.x = 512;
+  PLATOSize.y = 512;
 
   SetTTY();
   greeting();
