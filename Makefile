@@ -27,7 +27,7 @@ CONFIG  :=
  
 # Additional C compiler flags and options.
 # Default: none
-CFLAGS  = -Oi -Or -Os
+CFLAGS  = -Oris --static-locals
  
 # Additional assembler flags and options.
 # Default: none
@@ -35,7 +35,7 @@ ASFLAGS =
  
 # Additional linker flags and options.
 # Default: none
-LDFLAGS =
+LDFLAGS = c64-tgimousedata.o
  
 # Path to the directory containing C and ASM sources.
 # Default: src

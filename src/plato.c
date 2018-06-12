@@ -1,4 +1,3 @@
-#define _optspeed_
 #define PROTOCOL_DEBUG 1
 
 /*
@@ -10,10 +9,13 @@
 #include <serial.h>
 #include <peekpoke.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <mouse.h>
 */
 #include "font.h"
 #include "scale.h"
 #include "protocol.h"
+#include "key.h"
 
 #ifdef PROTOCOL_DEBUG
 //#include <cbm.h>
@@ -24,11 +26,16 @@
 static uint8_t modemc=0;
 static uint8_t lastmodemc=0;
 
+static uint8_t lastkey;
+
 static uint8_t CharWide=8;
 static uint8_t CharHigh=16; 
 static padBool TouchActive;
 
 static padPt TTYLoc;
+
+static uint16_t screen_w;
+static uint16_t screen_h;
 
 extern padPt PLATOSize;
 extern CharMem CurMem;
@@ -37,6 +44,7 @@ extern padBool FlowControl;
 extern padBool ModeBold;
 extern padBool Rotate;
 extern padBool Reverse;
+extern padBool FastText;
 extern DispMode CurMode;
 
 // PLATOTerm for Commodore 64
@@ -59,10 +67,24 @@ padByte welcomemsg_4[]={83,101,101,32,99,111,112,121,105,110,103,32,102,111,114,
 padByte welcomemsg_5[]={80,76,65,84,79,84,101,114,109,32,82,69,65,68,89};
 #define WELCOMEMSG_5_LEN 15
 
+#define MODIFIER_NONE  0x00
+#define MODIFIER_SHIFT 0x01
+#define MODIFIER_COMMO 0x02
+#define MODIFIER_CTRL  0x04
+
 // The static symbol for the c64 swlink driver
 extern char c64_swlink;
+
 extern void install_nmi_trampoline(void);
 extern void ShowPLATO(padByte *buff, uint16_t count);
+
+/**
+ * Wait(void) - Sleep for approx 16.67ms
+ */
+void Wait(void)
+{
+  waitvsync();
+}
 
 /**
  * SetTTY(void) - Switch to TTY mode
@@ -74,7 +96,8 @@ void SetTTY(void)
   Rotate=padF;
   Reverse=padF;
   CurMem=M0;
-  CurMode=ModeRewrite;
+  /* CurMode=ModeRewrite; */
+  CurMode=ModeWrite; /* For speed reasons. */
   tgi_setcolor(TGI_COLOR_WHITE);
   tgi_clear();
   CharWide=8;
@@ -105,7 +128,7 @@ uint8_t TermType(void)
  */
 uint8_t SubType(void)
 {
-  return 14; /* ASCII terminal subtype */
+  return 1; /* ASCII terminal subtype IST-III */
 }
 
 /**
@@ -165,7 +188,6 @@ void MemLoad(padWord addr, padWord value)
  */
 void CharLoad(padWord charnum, charData theChar)
 {
-  /* TODO: Implement CharLoad */
 }
 
 /**
@@ -192,6 +214,8 @@ void Mode7(padWord value)
 void TouchAllow(padBool allow)
 {
   TouchActive=allow;
+  if (TouchActive==1)
+    mouse_move(0,0);
 }
 
 /**
@@ -256,9 +280,12 @@ void send_byte(uint8_t b)
  */
 void BlockDraw(padPt* Coord1, padPt* Coord2)
 {
-  tgi_setcolor(TGI_COLOR_BLACK);
+  if (CurMode==ModeErase || CurMode==ModeInverse)
+    tgi_setcolor(TGI_COLOR_BLACK);
+  else
+    tgi_setcolor(TGI_COLOR_WHITE);
+  
   tgi_bar(scalex[Coord1->x],scaley[Coord1->y],scalex[Coord2->x],scaley[Coord2->y]);
-  tgi_setcolor(TGI_COLOR_WHITE);
 }
 
 /**
@@ -266,6 +293,11 @@ void BlockDraw(padPt* Coord1, padPt* Coord2)
  */
 void DotDraw(padPt* Coord)
 {
+  if (CurMode==ModeErase || CurMode==ModeInverse)
+    tgi_setcolor(TGI_COLOR_BLACK);
+  else
+    tgi_setcolor(TGI_COLOR_WHITE);
+  
   tgi_setpixel(scalex[Coord->x],scaley[Coord->y]);
 }
 
@@ -274,6 +306,11 @@ void DotDraw(padPt* Coord)
  */
 void LineDraw(padPt* Coord1, padPt* Coord2)
 {
+  if (CurMode==ModeErase || CurMode==ModeInverse)
+    tgi_setcolor(TGI_COLOR_BLACK);
+  else
+    tgi_setcolor(TGI_COLOR_WHITE);
+  
   tgi_line(scalex[Coord1->x],scaley[Coord1->y],scalex[Coord2->x],scaley[Coord2->y]);
 }
 
@@ -282,17 +319,22 @@ void LineDraw(padPt* Coord1, padPt* Coord2)
  */
 void CharDraw(padPt* Coord, unsigned char* ch, unsigned char count)
 {
-  int16_t offset=0; /* due to negative offsets */
-  uint8_t deltaX=5;
-  uint8_t deltaY=6;
-  int16_t x=0;
-  int16_t y=0;
-  uint8_t i=0; /* current character counter */
-  uint8_t j=0; /* vertical loop counter */
-  uint8_t k=0; /* horizontal loop counter */
-  uint8_t a=0; /* current character byte */
-  uint8_t b=0; /* current character row bit */
-  uint8_t z=0; /* ... */
+  int16_t offset; /* due to negative offsets */
+  uint16_t x;      /* Current X and Y coordinates */
+  uint16_t y;
+  uint16_t* px;   /* Pointers to X and Y coordinates used for actual plotting */
+  uint16_t* py;
+  uint8_t i; /* current character counter */
+  uint8_t j; /* vertical loop counter */
+  uint8_t k; /* horizontal loop counter */
+  uint8_t a; /* current character byte */
+  uint8_t b; /* current character row bit signed */
+  uint8_t width=CharWide;
+  uint8_t height=CharHigh;
+  uint16_t deltaX=1;
+  uint16_t deltaY=1;
+  uint8_t mainColor=TGI_COLOR_WHITE;
+  uint8_t altColor;
     
   switch(CurMem)
     {
@@ -310,32 +352,128 @@ void CharDraw(padPt* Coord, unsigned char* ch, unsigned char count)
       break;
     }
 
-  if (ModeBold)
+  if (CurMode==ModeRewrite)
     {
-      deltaX <<= 1;  // 16 pixels
-      deltaY <<= 1; // 32 pixels
+      altColor=TGI_COLOR_BLACK;
     }
-    
+  else if (CurMode==ModeInverse)
+    {
+      altColor=TGI_COLOR_WHITE;
+    }
+  
+  if (CurMode==ModeErase || CurMode==ModeInverse)
+    mainColor=TGI_COLOR_BLACK;
+  else
+    mainColor=TGI_COLOR_WHITE;
+  
+  if (FastText==padF)
+    {
+      goto chardraw_with_fries;
+    }
+
+ diet_chardraw:
   for (i=0;i<count;++i)
     {
-      y=scaley[(Coord->y)&0x1FF];
-      a=*ch++;
+      y=scaley[(Coord->y)+14&0x1FF];
+      a=*ch;
+      ++ch;
       a=a+offset;
-      for (j=0;j<deltaY;++j)
+      for (j=0;j<FONT_SIZE_Y;++j)
   	{
   	  b=font[fontptr[a]+j];
   	  x=scalex[(Coord->x&0x1FF)];
-  	  for (k=0;k<deltaX;++k)
+
+  	  for (k=0;k<FONT_SIZE_X;++k)
   	    {
-  	      z=b&0x80;
-  	      if (z==0x80)
-  		tgi_setpixel(x,y);
-  	      x++;
+  	      if (b & 0x80) /* check sign bit. */
+		{
+		  tgi_setcolor(mainColor);
+		  tgi_setpixel(x,y);
+		}
+
+	      x += deltaX;
   	      b<<=1;
   	    }
-  	  y++;
+
+	  y += deltaY;
   	}
-      Coord->x+=CharWide;
+
+      Coord->x+=width;
+    }
+
+  return;
+  
+ chardraw_with_fries:
+  if (ModeBold)
+    {
+      deltaX = deltaY = 2;
+      width<<=1;
+    }
+  
+  if (Rotate)
+    {
+      deltaX=-abs(deltaX);
+      width=-abs(width);
+    }
+
+  for (i=0;i<count;++i)
+    {
+      y=scaley[(Coord->y)+14&0x1FF];
+      a=*ch;
+      ++ch;
+      a=a+offset;
+      for (j=0;j<FONT_SIZE_Y;++j)
+  	{
+  	  b=font[fontptr[a]+j];
+  	  x=scalex[(Coord->x&0x1FF)];
+
+	  if (Rotate)
+	    {
+	      px=&y;
+	      py=&x;
+	    }
+	  else
+	    {
+	      px=&x;
+	      py=&y;
+	    }
+
+  	  for (k=0;k<FONT_SIZE_X;++k)
+  	    {
+  	      if (b<0) /* check sign bit. */
+		{
+		  tgi_setcolor(mainColor);
+		  if (ModeBold)
+		    {
+		      tgi_setpixel(*px+1,*py);
+		      tgi_setpixel(*px,*py+1);
+		      tgi_setpixel(*px+1,*py+1);
+		    }
+		  tgi_setpixel(*px,*py);
+		}
+	      else
+		{
+		  if (CurMode==ModeInverse || CurMode==ModeRewrite)
+		    {
+		      tgi_setcolor(altColor);
+		      if (ModeBold)
+			{
+			  tgi_setpixel(*px+1,*py);
+			  tgi_setpixel(*px,*py+1);
+			  tgi_setpixel(*px+1,*py+1);
+			}
+		      tgi_setpixel(*px,*py); 
+		    }
+		}
+
+	      x += deltaX;
+  	      b<<=1;
+  	    }
+
+	  y += deltaY;
+  	}
+
+      Coord->x+=width;
     }
 
 }
@@ -373,6 +511,7 @@ void TTYChar(padByte theChar)
 void greeting(void)
 {
   padPt coord;
+
   coord.x=168; coord.y=480; CharDraw(&coord,welcomemsg_1,WELCOMEMSG_1_LEN);
   coord.x=144; coord.y=464; CharDraw(&coord,welcomemsg_2,WELCOMEMSG_2_LEN);
   coord.x=104; coord.y=432; CharDraw(&coord,welcomemsg_3,WELCOMEMSG_3_LEN);
@@ -380,10 +519,63 @@ void greeting(void)
   coord.x=16;  coord.y=384; CharDraw(&coord,welcomemsg_5,WELCOMEMSG_5_LEN);
 }
 
+/**
+ * handle_keyboard - Handle the keyboard presses
+ */
+void handle_keyboard(void)
+{
+#ifdef c64
+  if (PEEK(0xCB)==lastkey)
+    return;
+
+  if (PEEK(0x28D)==MODIFIER_NONE)
+    Key(KEYBOARD_TO_PLATO[PEEK(0xCB)]);
+  else if (PEEK(0x28D)==MODIFIER_SHIFT)
+    Key(KEYBOARD_TO_PLATO_SHIFT[PEEK(0xCB)]);
+  else if (PEEK(0x28D)==MODIFIER_COMMO)
+    Key(KEYBOARD_TO_PLATO_COMMO[PEEK(0xCB)]);
+  else if (PEEK(0x28D)==0x03)
+    Key(KEYBOARD_TO_PLATO_CS[PEEK(0xCB)]);
+  
+  lastkey=PEEK(0xCB);
+#endif
+}
+
+/**
+ * handle_mouse - Process mouse events and turn into scaled touch events
+ */
+void handle_mouse(void)
+{
+#ifdef c64
+  struct mouse_info info;
+  uint8_t lastbuttons;
+  padPt coord;
+  
+  /* If touch screen isn't active, don't let the mouse be used. */
+  if (TouchActive==0)
+    {
+      mouse_move(screen_w,screen_h);
+      return;
+    }
+
+  mouse_info(&info);
+
+  if (info.buttons == lastbuttons)
+    return; /* debounce */
+  else if ((info.buttons & MOUSE_BTN_LEFT))
+    {
+      coord.x = scaletx[info.pos.x];
+      coord.y = scalety[info.pos.y];
+      Touch(&coord);
+    }
+  lastbuttons = info.buttons;
+#endif
+}
+
 void main(void)
 {
     /*
-  static const uint8_t pal[2]={TGI_COLOR_BLACK,TGI_COLOR_ORANGE};  
+  static const uint8_t pal[2]={TGI_COLOR_BLUE,TGI_COLOR_LIGHTBLUE};
   struct ser_params params = {
     SER_BAUD_19200,
     SER_BITS_8,
@@ -400,6 +592,7 @@ void main(void)
       return;
     }
 
+  mouse_install(&mouse_def_callbacks,&mouse_static_stddrv);
   tgi_install(tgi_static_stddrv);
     */
   tgi_init();
@@ -413,6 +606,10 @@ void main(void)
   while(*msg){
       ser_put_clean(*msg++);
   }
+
+
+  screen_w = 320;
+  screen_h = 192;
 
   SetTTY();
   greeting();
@@ -433,13 +630,30 @@ void main(void)
 	      ShowPLATO(&modemc,1);
 	    }
 	}
-      if (kbhit())
+      if (TTY)
 	{
-	  send_byte(cgetc());
+	  mouse_move(screen_w,screen_h);
+	  if (kbhit())
+	    {
+	      send_byte(cgetc());
+	    }
+	}
+      else
+	{
+	  handle_keyboard();
+	  if (TouchActive)
+	    {
+	      handle_mouse();
+	    }
+	  else
+	    {
+	      mouse_move(screen_w,screen_h);
+	    }
 	}
     }
   tgi_done();
   ser_close();
   ser_uninstall();
-  tgi_uninstall();  
+  tgi_uninstall();
+  mouse_uninstall();
 }

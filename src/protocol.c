@@ -1,6 +1,7 @@
 /* Copyright (c) 1990 by Steve Peltz */
 
 #include <stdbool.h>
+//#include <peekpoke.h>
 #include "protocol.h"
 
 #define	BSIZE	64
@@ -34,6 +35,7 @@ extern uint16_t CharAddress(void);
 extern padByte MemRead(padWord addr);
 extern padByte ExtIn(void);
 
+extern void Wait(void);
 extern void Beep(void);
 extern void send_byte(uint8_t b);
 extern void BlockDraw(padPt* Coord1, padPt* Coord2);
@@ -102,7 +104,7 @@ padBool TTY,			/* TTY mode */
   ModeBold,			/* Character plotting conditions */
   Rotate, Reverse;
 DispMode CurMode;		/* Current PLATO plotting mode */
-
+padBool FastText;               /* Indicate to main program if text optimizations can be done. */
 
 
 /*----------------------------------------------*
@@ -125,6 +127,7 @@ InitTTY (void)
   charCount = 0;
   EscFlag = false;
   TTY = true;
+  FastText = true;
   FlowControl = false;
   SetTTY();
 }
@@ -157,6 +160,7 @@ InitPLATOx (void)
   ModeBold = false;
   Rotate = false;
   Reverse = false;
+  FastText = true;
   CurMem = M0;
   CurMode = ModeRewrite;
 }
@@ -197,6 +201,17 @@ Key (padWord theKey)
     }
 }
 
+/*----------------------------------------------*
+ *	Touch					*
+ *						*
+ *	Send a touch key (01yyyyxxxx).		*
+ *----------------------------------------------*/
+
+void	Touch(padPt* where)
+{
+	Key(0x100 | ((where->x >> 1) & 0xF0) |
+		((where->y >> 5) & 0x0F));
+}
 
 /*----------------------------------------------*
  *	Ext					*
@@ -222,6 +237,7 @@ Echo (padWord theKey)
 {
   Key (0x080 | theKey);
 }
+
 
 
 /*----------------------------------------------*
@@ -463,7 +479,7 @@ LoadEchox (void)
       break;
 
     case 0x71:
-      Echo (SubType ());	/* subtype */
+      Echo (1);	/* subtype */
       break;
 
     case 0x72:
@@ -749,15 +765,19 @@ ShowPLATO (padByte *buff, uint16_t count)
 
 	    case 0x11:
 	      CurMode = ModeInverse;
+	      SetFast();
 	      break;
 	    case 0x12:
 	      CurMode = ModeWrite;
+	      SetFast();
 	      break;
 	    case 0x13:
 	      CurMode = ModeErase;
+	      SetFast();
 	      break;
 	    case 0x14:
 	      CurMode = ModeRewrite;
+	      SetFast();
 	      break;
 
 	    case 0x32:
@@ -786,21 +806,27 @@ ShowPLATO (padByte *buff, uint16_t count)
 
 	    case 0x4A:
 	      Rotate = false;
+	      SetFast();
 	      break;
 	    case 0x4B:
 	      Rotate = true;
+	      SetFast();
 	      break;
 	    case 0x4C:
 	      Reverse = false;
+	      SetFast();
 	      break;
 	    case 0x4D:
 	      Reverse = true;
+	      SetFast();
 	      break;
 	    case 0x4E:
 	      ModeBold = false;
+	      SetFast();
 	      break;
 	    case 0x4F:
 	      ModeBold = true;
+	      SetFast();
 	      break;
 
 	    case 0x50:
@@ -855,6 +881,8 @@ ShowPLATO (padByte *buff, uint16_t count)
 	    }
 	  switch (theChar)
 	    {
+	    case 0x00:
+	      Wait();
 	    case 0x08:
 	      BSx ();
 	      break;
@@ -898,4 +926,13 @@ ShowPLATO (padByte *buff, uint16_t count)
       CharDraw (&charCoord, charBuff, charCount);
       charCount = 0;
     }
+}
+
+/**
+ * SetFast()
+ * Toggle fast text output if mode = write or erase, and no rotate or bold
+ */
+void SetFast(void)
+{
+  FastText = (((CurMode == ModeWrite) || (CurMode == ModeErase)) && ((Rotate == padF) && (ModeBold == padF))); 
 }
