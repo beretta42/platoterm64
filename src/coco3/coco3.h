@@ -21,4 +21,8 @@ void memset(char *s, int c, int n);
 int kbhit(void);
 unsigned char cgetc(void);
 
+void mouse_move(int x, int y);
+void waitvsync(void);
+int abs(int x);
+
 void platform_scroll_up(void);

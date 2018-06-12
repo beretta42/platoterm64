@@ -100,3 +100,20 @@ void platform_scroll_up( void )
 	*d++ = 0;
 }
 
+void mouse_move(int x, int y)
+{
+    // todo
+}
+
+void waitvsync(void)
+{
+    // todo
+}
+
+int abs(int x)
+{
+    /* todo / fime : 
+       check usage of this function... 
+       it looks like an effective noop in calling code */
+    return x;
+}
