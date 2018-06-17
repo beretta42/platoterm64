@@ -1,8 +1,9 @@
 #include "coco3.h"
 
-
 extern unsigned int scalex[];
 extern unsigned int scaley[];
+
+void TTYChar(unsigned char b);
 
 #define screen ((unsigned char *)0x6000)
 
@@ -116,4 +117,137 @@ int abs(int x)
        check usage of this function... 
        it looks like an effective noop in calling code */
     return x;
+}
+
+
+/* Home rolled keyboard handling */
+#define keystrobe (*(volatile unsigned char *)0xff02)
+#define keyread   (*(volatile unsigned char *)0xff00)
+unsigned char ktab[8];
+unsigned char ktab1[8];
+volatile unsigned char key;
+volatile unsigned char meta;
+
+/* keycode to ascii table */
+unsigned char atab[] = {
+    '@', 'h', 'p', 'x', '0', '8', 13 /*enter*/,
+    'a', 'i', 'q', 'y', '1', '9', 0 /*clear*/,
+    'b', 'j', 'r', 'z', '2', ':', 0 /*break*/,
+    'c', 'k', 's', 0/*up*/, '3', ';', 0 /*alt*/,
+    'd', 'l', 't', 0/*dn*/, '4', ',', 0 /*cntl*/,
+    'e', 'm', 'u', 0/*lf*/, '5', '-', 0 /*f1*/,
+    'f', 'n', 'v', 0/*rt*/, '6', '.', 0 /*f2*/,
+    'g', 'o', 'w', ' ', '7', '/', 0 /*shift*/,
+};
+
+/* keycode to shifted ascii table */
+unsigned char satab[] = {
+    '@', 'H', 'P', 'X', '0', '(', 10 /*enter*/,
+    'A', 'I', 'Q', 'Y', '!', ')', 0 /*clear*/,
+    'B', 'J', 'R', 'Z', '"', '*', 0 /*break*/,
+    'C', 'K', 'S', 0/*up*/, '#', '+', 0 /*alt*/,
+    'D', 'L', 'T', 0/*dn*/, '$', '<', 0 /*cntl*/,
+    'E', 'M', 'U', 0/*lf*/, '%', '=', 0 /*f1*/,
+    'F', 'N', 'V', 0/*rt*/, '&', '>', 0 /*f2*/,
+    'G', 'O', 'W', ' ', '\'', '?', 0 /*shift*/,
+};
+
+/* keycode to plato normal */
+unsigned char knone[] = {
+    '@', 'h', 'p', 'x', '0', '8', 0x36 /*enter*/,
+    'a', 'i', 'q', 'y', '1', '9', 0 /*clear*/,
+    'b', 'j', 'r', 'z', '2', ':', 0 /*break*/,
+    'c', 'k', 's', 0/*up*/, '3', ';', 0 /*alt*/,
+    'd', 'l', 't', 0/*dn*/, '4', ',', 0 /*cntl*/,
+    'e', 'm', 'u', 0/*lf*/, '5', '-', 0 /*f1*/,
+    'f', 'n', 'v', 0/*rt*/, '6', '.', 0 /*f2*/,
+    'g', 'o', 'w', ' ', '7', '/', 0 /*shift*/,
+};
+
+
+void pnibble(unsigned char b)
+{
+    b &= 0xf;
+    if (b > 9)
+	TTYChar( b - 10 + 'a');
+    else
+	TTYChar( b + '0' );
+}
+
+void pbyte(unsigned char b)
+{
+    pnibble(b>>4);
+    pnibble(b);
+}
+
+/* poll the coco keyboard - called from interrupt */
+void kpoll(void)
+{
+    unsigned char m = 0;
+    unsigned char b = 0xfe;
+    int i,j;
+    /* copy existing ktab to prime */
+    for(i = 0; i < 8; i++)
+	ktab1[i] = ktab[i];
+    /* read keys into table */
+    for(i = 0; i < 8; i++){
+	keystrobe = b;
+	ktab[i] = (~keyread) & 0x7f;
+	b = (b << 1) + 1;
+    }
+    /* gather and mask shift keys */
+    m += (ktab[7] & 0x40) ? 1 : 0;
+    ktab[7] &= ~0x40;
+    m <<= 1;
+    m += (ktab[4] & 0x40) ? 1 : 0;
+    ktab[4] &= ~0x40;
+    m <<= 1;
+    m += (ktab[3] & 0x40) ? 1 : 0;
+    ktab[3] &= ~0x40;
+    /* find new char code, if any */
+    for (i = 0; i < 8; i++) {
+	b = (ktab[i] ^ ktab1[i]) & ktab[i];
+	for (j = 0; j < 7; j++) {
+	    if (b & 1) {
+		key = i * 7 + j + 1;
+		meta = m;
+		return;
+	    }
+	    b = b >> 1;
+	}
+    }
+}
+
+/* is there a key waiting? */
+int kbhit(void) 
+{
+    return key;
+}
+
+/* fixme: this is supposed to return ascii not keycode */
+unsigned char cgetc(void)
+{
+    unsigned char k = key;
+    key = 0;
+    if (meta & 4){
+	TTYChar(satab[k-1]);
+	return satab[k-1];
+    }
+    else {
+	TTYChar(atab[k-1]);
+	return atab[k-1];
+    }
+}
+
+void Key(unsigned char b);
+void platform_handle_keyboard(void)
+{
+    int k;
+
+    if(key){
+	k = key;
+	key = 0;
+	Key(satab[k-1]);
+    }
+    return;
 }

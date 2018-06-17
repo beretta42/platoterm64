@@ -538,6 +538,8 @@ void handle_keyboard(void)
     Key(KEYBOARD_TO_PLATO_CS[PEEK(0xCB)]);
   
   lastkey=PEEK(0xCB);
+#else
+  platform_handle_keyboard();
 #endif
 }
 
@@ -601,12 +603,13 @@ void main(void)
   //POKE(0xD020,0);
   //tgi_setpalette(pal);
   ser_open();
-  //ser_ioctl(1, NULL);  
+  //ser_ioctl(1, NULL);
+  
   char *msg = "tcp connect irata.online 8005\r\n";
   while(*msg){
       ser_put_clean(*msg++);
   }
-
+  
 
   screen_w = 320;
   screen_h = 192;

@@ -2,8 +2,9 @@
 
 	export	start
 	export  _ashlhi3
-	export  _kbhit
-	export  _cgetc
+	export  _di
+	export  _ei
+	import  _kpoll
 	import  main
 
 	section .text
@@ -38,21 +39,17 @@ _ashlhi3_1:
 _ashlhi3_2:
         puls    x,pc
 
-key_hack:
-	.db	0
-
-_kbhit:
-	jsr	$a1cb		; A = byte
-	sta	key_hack
-	clrb
-	tfr	d,x
-	rts
-
-_cgetc:
-	ldb	key_hack
-	rts
 
 interrupt:
 	lda	$ff02		; clear vsync pia
+	jsr	_kpoll		; go poll keyboard
 	jsr	poll		; go poll and add drivewire
 a@	rti			; return from interrupt
+
+_di:
+	orcc	#$50		; stop interrupts
+	rts
+
+_ei:
+	andcc	#~$50		; start interrupts
+	rts
