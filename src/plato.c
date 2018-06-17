@@ -23,16 +23,23 @@
 #endif
 #include "coco3.h"
 
+static uint8_t color_background=TGI_COLOR_BLUE;
+static uint8_t color_foreground=TGI_COLOR_LIGHTBLUE;
+static uint8_t color_border=TGI_COLOR_LIGHTBLUE;
+static uint8_t pal[2];
 static uint8_t modemc=0;
 static uint8_t lastmodemc=0;
 
 static uint8_t lastkey;
 
+static padPt TTYLoc;
 static uint8_t CharWide=8;
 static uint8_t CharHigh=16; 
 static padBool TouchActive;
 
-static padPt TTYLoc;
+static struct mouse_info mouse_data;
+static uint16_t previous_mouse_x;
+static uint16_t previous_mouse_y;
 
 static uint16_t screen_w;
 static uint16_t screen_h;
@@ -66,11 +73,6 @@ padByte welcomemsg_4[]={83,101,101,32,99,111,112,121,105,110,103,32,102,111,114,
 // PLATOTerm READY
 padByte welcomemsg_5[]={80,76,65,84,79,84,101,114,109,32,82,69,65,68,89};
 #define WELCOMEMSG_5_LEN 15
-
-#define MODIFIER_NONE  0x00
-#define MODIFIER_SHIFT 0x01
-#define MODIFIER_COMMO 0x02
-#define MODIFIER_CTRL  0x04
 
 // The static symbol for the c64 swlink driver
 extern char c64_swlink;
@@ -213,9 +215,17 @@ void Mode7(padWord value)
  */
 void TouchAllow(padBool allow)
 {
+  // If mouse is off screen (due to previously being moved off screen, move onscreen to make visible.
+  if (allow)
+    {
+      mouse_move(previous_mouse_x,previous_mouse_y);
+    }
+  else
+    {
+      previous_mouse_x = mouse_data.pos.x;
+      previous_mouse_y = mouse_data.pos.y;
+    }
   TouchActive=allow;
-  if (TouchActive==1)
-    mouse_move(0,0);
 }
 
 /**
@@ -335,7 +345,8 @@ void CharDraw(padPt* Coord, unsigned char* ch, unsigned char count)
   uint16_t deltaY=1;
   uint8_t mainColor=TGI_COLOR_WHITE;
   uint8_t altColor;
-    
+  uint8_t *p;
+  
   switch(CurMem)
     {
     case M0:
@@ -377,10 +388,11 @@ void CharDraw(padPt* Coord, unsigned char* ch, unsigned char count)
       y=scaley[(Coord->y)+14&0x1FF];
       a=*ch;
       ++ch;
-      a=a+offset;
+      a+=offset;
+      p=&font[fontptr[a]];
       for (j=0;j<FONT_SIZE_Y;++j)
   	{
-  	  b=font[fontptr[a]+j];
+  	  b=*p;
   	  x=scalex[(Coord->x&0x1FF)];
 
   	  for (k=0;k<FONT_SIZE_X;++k)
@@ -391,11 +403,12 @@ void CharDraw(padPt* Coord, unsigned char* ch, unsigned char count)
 		  tgi_setpixel(x,y);
 		}
 
-	      x += deltaX;
+	      ++x;
   	      b<<=1;
   	    }
 
-	  y += deltaY;
+	  ++y;
+	  ++p;
   	}
 
       Coord->x+=width;
@@ -520,26 +533,86 @@ void greeting(void)
 }
 
 /**
+ * Set the terminal colors
+ */
+void set_terminal_colors(void)
+{
+  pal[0]=color_background;
+  pal[1]=color_foreground;
+  tgi_setpalette(pal);
+  POKE(0xD020,color_border);
+}
+
+/**
+ * handle_keyboard - If platoKey < 0x7f, pass off to protocol
+ * directly. Otherwise, platoKey is an access key, and the
+ * ACCESS key must be sent, followed by the particular
+ * access key from PTAT_ACCESS.
+ */
+void handle_key(uint8_t platoKey)
+{
+  if (platoKey==0xff)
+    return;
+  
+  if (platoKey>0x7F)
+    {
+      Key(ACCESS);
+      Key(ACCESS_KEYS[platoKey-0x80]);
+      return;
+    }
+  Key(platoKey);
+  return;
+}
+
+/**
  * handle_keyboard - Handle the keyboard presses
  */
 void handle_keyboard(void)
 {
 #ifdef c64
-  if (PEEK(0xCB)==lastkey)
-    return;
+  uint8_t key=PEEK(0xCB);
+  uint8_t modifier=PEEK(0x28D);
 
-  if (PEEK(0x28D)==MODIFIER_NONE)
-    Key(KEYBOARD_TO_PLATO[PEEK(0xCB)]);
-  else if (PEEK(0x28D)==MODIFIER_SHIFT)
-    Key(KEYBOARD_TO_PLATO_SHIFT[PEEK(0xCB)]);
-  else if (PEEK(0x28D)==MODIFIER_COMMO)
-    Key(KEYBOARD_TO_PLATO_COMMO[PEEK(0xCB)]);
-  else if (PEEK(0x28D)==0x03)
-    Key(KEYBOARD_TO_PLATO_CS[PEEK(0xCB)]);
+  // Handle Function keys
+  if (key==0x04 && lastkey!=0x04)
+    {
+      // Change colors
+      if (modifier==0x00)
+	{
+	  ++color_background;
+	  color_background&=0x0f;
+	}
+      else if (modifier==0x01)
+	{
+	  ++color_foreground;
+	  color_background&=0x0f;
+	}
+      else if (modifier==0x02)
+	{
+	  ++color_border;
+	  color_border&=0x0f;
+	}
+      set_terminal_colors();
+    }
   
-  lastkey=PEEK(0xCB);
+  if (key!=lastkey)
+    {  
+      if (modifier==MODIFIER_NONE)
+	handle_key(KEYBOARD_TO_PLATO[key]);
+      else if (modifier==MODIFIER_SHIFT)
+	handle_key(KEYBOARD_TO_PLATO_SHIFT[key]);
+      else if (modifier==MODIFIER_COMMO)
+	handle_key(KEYBOARD_TO_PLATO_COMMO[key]);
+      else if (modifier==MODIFIER_COMMO_SHIFT)
+	handle_key(KEYBOARD_TO_PLATO_CS[key]);
+      else if (modifier==MODIFIER_CTRL)
+	handle_key(KEYBOARD_TO_PLATO_CTRL[key]);
+      else if (modifier==MODIFIER_CTRL_SHIFT)
+	handle_key(KEYBOARD_TO_PLATO_CTRL_SHIFT[key]);
+    }
+      lastkey=key;
 #else
-  platform_handle_keyboard();
+      platform_handle_keyboard();
 #endif
 }
 
@@ -549,35 +622,35 @@ void handle_keyboard(void)
 void handle_mouse(void)
 {
 #ifdef c64
-  struct mouse_info info;
   uint8_t lastbuttons;
   padPt coord;
   
+  mouse_info(&mouse_data);
+
   /* If touch screen isn't active, don't let the mouse be used. */
   if (TouchActive==0)
     {
+      previous_mouse_x = mouse_data.pos.x;
+      previous_mouse_y = mouse_data.pos.y;
       mouse_move(screen_w,screen_h);
       return;
     }
-
-  mouse_info(&info);
-
-  if (info.buttons == lastbuttons)
+  
+  if (mouse_data.buttons == lastbuttons)
     return; /* debounce */
-  else if ((info.buttons & MOUSE_BTN_LEFT))
+  else if ((mouse_data.buttons & MOUSE_BTN_LEFT))
     {
-      coord.x = scaletx[info.pos.x];
-      coord.y = scalety[info.pos.y];
+      coord.x = scaletx[mouse_data.pos.x];
+      coord.y = scalety[mouse_data.pos.y];
       Touch(&coord);
     }
-  lastbuttons = info.buttons;
+  lastbuttons = mouse_data.buttons;
 #endif
 }
 
 void main(void)
 {
-    /*
-  static const uint8_t pal[2]={TGI_COLOR_BLUE,TGI_COLOR_LIGHTBLUE};
+/*
   struct ser_params params = {
     SER_BAUD_19200,
     SER_BITS_8,
@@ -594,6 +667,7 @@ void main(void)
       return;
     }
 
+  POKE(0xD020,0);
   mouse_install(&mouse_def_callbacks,&mouse_static_stddrv);
   tgi_install(tgi_static_stddrv);
     */
