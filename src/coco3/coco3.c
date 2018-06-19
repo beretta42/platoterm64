@@ -154,6 +154,18 @@ unsigned char satab[] = {
 
 /* keycode to plato normal */
 unsigned char knone[] = {
+    0x98, 'H', 'P', 'X', 0x00, 0x08, 0x16 /*enter*/,
+    'A', 'I', 'Q', 'Y', 0x01, 0x09, 0 /*clear*/,
+    'B', 'J', 'R', 'Z', 0x02, 0x7c, 0 /*break*/,
+    'C', 'K', 'S', 0x0c, 0x03, 0x5c, 0 /*alt*/,
+    'D', 'L', 'T', 0/*dn*/, 0x04, 0x21, 0 /*cntl*/,
+    'E', 'M', 'U', 0x0d/*lf*/, 0x05, 0x5b, 0 /*f1*/,
+    'F', 'N', 'V', 0/*rt*/, 0x06, 0x21, 0 /*f2*/,
+    'G', 'O', 'W', 0x40, 0x07, 0x5d, 0 /*shift*/,
+};
+
+/* keycode to plato shifted */
+unsigned char kshift[] = {
     '@', 'h', 'p', 'x', '0', '8', 0x36 /*enter*/,
     'a', 'i', 'q', 'y', '1', '9', 0 /*clear*/,
     'b', 'j', 'r', 'z', '2', ':', 0 /*break*/,
@@ -161,8 +173,34 @@ unsigned char knone[] = {
     'd', 'l', 't', 0/*dn*/, '4', ',', 0 /*cntl*/,
     'e', 'm', 'u', 0/*lf*/, '5', '-', 0 /*f1*/,
     'f', 'n', 'v', 0/*rt*/, '6', '.', 0 /*f2*/,
+    'g', 'o', 'w', 0x60, '7', 0x7d, 0 /*shift*/,
+};
+
+/* keycode to plato control */
+unsigned char kcntl[] = {
+    '@', 0x15, 'p', 'x', '0', '8', 0x33 /*enter*/,
+    0x1c, 'i', 'q', 'y', '1', '9', 0 /*clear*/,
+    0x18, 'j', 'r', 'z', '2', ':', 0 /*break*/,
+    'c', 'k', 0x1a, 0/*up*/, '3', ';', 0 /*alt*/,
+    0x19, 0x1d, 't', 0/*dn*/, '4', ',', 0 /*cntl*/,
+    0x17, 'm', 'u', 0/*lf*/, '5', '-', 0 /*f1*/,
+    'f', 'n', 'v', 0/*rt*/, '6', '.', 0 /*f2*/,
     'g', 'o', 'w', ' ', '7', '/', 0 /*shift*/,
 };
+
+/* keycode to plato shift-cntls */
+unsigned char kshcntl[] = {
+    '@', 0x35, 'p', 'x', '0', '8', 0x33 /*enter*/,
+    0x3c, 'i', 'q', 'y', '1', '9', 0 /*clear*/,
+    0x38, 'j', 'r', 'z', '2', ':', 0 /*break*/,
+    'c', 'k', 0x3a, 0/*up*/, '3', ';', 0 /*alt*/,
+    0x39, 0x3d, 't', 0/*dn*/, '4', ',', 0 /*cntl*/,
+    0x37, 'm', 'u', 0/*lf*/, '5', '-', 0 /*f1*/,
+    'f', 'n', 'v', 0/*rt*/, '6', '.', 0 /*f2*/,
+    'g', 'o', 'w', 0x60, '7', 0x7d, 0 /*shift*/,
+};
+
+
 
 
 void pnibble(unsigned char b)
@@ -239,7 +277,8 @@ unsigned char cgetc(void)
     }
 }
 
-void Key(unsigned char b);
+void handle_key(unsigned char);
+
 void platform_handle_keyboard(void)
 {
     int k;
@@ -247,7 +286,14 @@ void platform_handle_keyboard(void)
     if(key){
 	k = key;
 	key = 0;
-	Key(satab[k-1]);
+	if (meta == 0)
+	    handle_key(knone[k-1]);
+	else if (meta == 4)
+	    handle_key(kshift[k-1]);
+	else if (meta == 2)
+	    handle_key(kcntl[k-1]);
+	else if (meta == 6)
+	    handle_key(kshcntl[k-1]);
     }
     return;
 }
