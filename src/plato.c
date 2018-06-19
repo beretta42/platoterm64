@@ -23,9 +23,9 @@
 #endif
 #include "coco3.h"
 
-static uint8_t color_background=TGI_COLOR_BLUE;
-static uint8_t color_foreground=TGI_COLOR_LIGHTBLUE;
-static uint8_t color_border=TGI_COLOR_LIGHTBLUE;
+static uint8_t color_background=0;
+static uint8_t color_foreground=0xff;
+static uint8_t color_border=0;
 static uint8_t pal[2];
 static uint8_t modemc=0;
 static uint8_t lastmodemc=0;
@@ -215,6 +215,7 @@ void Mode7(padWord value)
  */
 void TouchAllow(padBool allow)
 {
+#ifdef c64
   // If mouse is off screen (due to previously being moved off screen, move onscreen to make visible.
   if (allow)
     {
@@ -226,6 +227,7 @@ void TouchAllow(padBool allow)
       previous_mouse_y = mouse_data.pos.y;
     }
   TouchActive=allow;
+#endif
 }
 
 /**
@@ -539,8 +541,8 @@ void set_terminal_colors(void)
 {
   pal[0]=color_background;
   pal[1]=color_foreground;
-  tgi_setpalette(pal);
-  POKE(0xD020,color_border);
+  //tgi_setpalette(pal);
+  //POKE(0xD020,color_border);
 }
 
 /**
