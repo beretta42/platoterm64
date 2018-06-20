@@ -3,6 +3,8 @@
 extern unsigned int scalex[];
 extern unsigned int scaley[];
 
+unsigned char color = 0xff;
+
 void TTYChar(unsigned char b);
 
 #define screen ((unsigned char *)0x6000)
@@ -27,7 +29,11 @@ void tgi_setpixel (int x, int y)
     mask = 1 << rem;
     x >>= 3;
     off = y * 40 + x;
-    screen[off] = screen[off] | mask;
+    if (color){
+	screen[off] = screen[off] | mask;
+    }
+    else 
+	screen[off] = screen[off] & ~mask;
 }
 
 
@@ -63,16 +69,28 @@ tgi_setpixel (x1, y1);
 else { int fraction = dx - (dy >> 1); while (y1 != y2) { if (fraction >= 0) { x1 += stepx; fraction -= dy; } y1 += stepy; fraction += dx; tgi_setpixel (x1, y1); } }
 }
 
-void tgi_setcolor(unsigned char color)
+void tgi_setcolor(unsigned char c)
 {
-
+    color = c;
 }
 
 
 void tgi_bar(int x1, int y1, int x2, int y2)
 {
-    
-
+    int d;
+    int h;
+    if (y1 < y2){
+	d = 1;
+	h = y2 - y1;
+    }
+    else { 
+	d = -1;
+	h = y1 - y2;
+    }
+    do {
+	tgi_line(x2,y1,x1,y1);
+	y1 += d;
+    } while (h--);
 }
 
 void tgi_clear (void)
