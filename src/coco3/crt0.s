@@ -27,19 +27,6 @@ start
 	rts
 
 
-_ashlhi3:
-        pshs    x
-_ashlhi3_1:
-        leax    -1,x
-        cmpx    #-1
-        beq     _ashlhi3_2
-        aslb
-        rola
-        bra     _ashlhi3_1
-_ashlhi3_2:
-        puls    x,pc
-
-
 interrupt:
 	lda	$ff02		; clear vsync pia
 	jsr	_kpoll		; go poll keyboard

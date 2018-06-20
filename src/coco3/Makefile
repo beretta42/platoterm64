@@ -29,7 +29,7 @@ $(AOBJ): $(ASRC)
 $(COBJ): $(CSRC)
 
 plato: $(AOBJ) $(COBJ)
-	lwlink -b -o plato.bin -s basic.link -m plato.map $(OBJ)
+	lwlink -L$(LIBGCCDIR) -lgcc -b -o plato.bin -s basic.link -m plato.map $(OBJ)
 
 plato-disk: plato
 	rm -f plato.dsk
