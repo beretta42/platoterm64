@@ -21,14 +21,14 @@ static void ptermDrawPoint(int x, int y)
 
 void tgi_setpixel (int x, int y)
 {
-    unsigned char rem;
     unsigned char mask;
     int off;
     
-    rem = 7 - (x & 7);
-    mask = 1 << rem;
+    mask = 0x80 >> (x & 7);
     x >>= 3;
     off = y * 40 + x;
+    /* for 1 bpp this works, but should be
+       more like: screen = (screen & ~mask) | (color & mask) */
     if (color){
 	screen[off] = screen[off] | mask;
     }
