@@ -38,5 +38,5 @@ plato-disk: plato
 	decb copy -a -0 -l AUTOEXEC.BAS plato.dsk,AUTOEXEC.BAS
 
 clean:
-	rm -f *.o *~ plato.bin plato.dsk plato.map
+	rm -f ../*.o *.o *~ plato.bin plato.dsk plato.map
 
