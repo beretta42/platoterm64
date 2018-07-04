@@ -170,13 +170,7 @@ void keyboard_main(void){
  * keyboard_clear() - Clear the keyboard buffer
  */
 void keyboard_clear(void){
-    int i = 0;
-    di();
-    for( ; i < 8; i++ ){
-	ktab[i] = 0x00;
-	ktab1[i] = 0x00;
-    }
-    ei();
+    key = 0;
 };
 
 
