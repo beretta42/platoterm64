@@ -18,6 +18,7 @@ char ser_put_clean(char c);
 char ser_get(char *c);
 
 static uint8_t ch = 0;
+static uint8_t lastch = 0;
 
 /**
  * io_init() - Set-up the I/O
@@ -55,7 +56,14 @@ void io_main(void){
  * io_recv_serial() - Receive and interpret serial data.
  */
 void io_recv_serial(void){
-    if (!ser_get(&ch)) ShowPLATO(&ch,1);
+    if (!ser_get(&ch)) {
+	if (ch == 0xff && lastch == 0xff)
+	    lastch = 0x00;
+	else {
+	    lastch = ch;
+	    ShowPLATO(&ch, 1);
+	}
+    }
 };
 
 /**
