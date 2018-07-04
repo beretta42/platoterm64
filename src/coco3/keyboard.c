@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include "../keyboard.h"
 #include "../protocol.h"
+#include "../screen.h"
 
 #define keystrobe (*(volatile unsigned char *)0xff02)
 #define keyread   (*(volatile unsigned char *)0xff00)
@@ -154,14 +155,24 @@ void keyboard_main(void){
     if(key){
 	k = key;
 	key = 0;
-	if (meta == 0)
-	    keyboard_out(knone[k-1]);
-	else if (meta == 4)
-	    keyboard_out(kshift[k-1]);
-	else if (meta == 2)
-	    keyboard_out(kcntl[k-1]);
-	else if (meta == 6)
-	    keyboard_out(kshcntl[k-1]);
+	if (TTY) {
+	    if (meta & 4)
+		k = satab[k-1];
+	    else
+		k = atab[k-1];
+	    ser_put_clean(k);
+	    screen_tty_char(k);
+	} 
+	else {
+	    if (meta == 0)
+		keyboard_out(knone[k-1]);
+	    else if (meta == 4)
+		keyboard_out(kshift[k-1]);
+	    else if (meta == 2)
+		keyboard_out(kcntl[k-1]);
+	    else if (meta == 6)
+		keyboard_out(kshcntl[k-1]);
+	}
     }
     return;
 };
