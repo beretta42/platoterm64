@@ -25,11 +25,9 @@ static uint8_t lastch = 0;
  */
 void io_init(void){
     ser_open();
-    TTY = -1;
-    /*    char *str = "tcp connect irata.online 8005\r\n";
+    char *str = "tcp connect irata.online 8005\r\n";
     while (*str)
 	ser_put_clean(*str++);
-    */
 };
 
 /**
