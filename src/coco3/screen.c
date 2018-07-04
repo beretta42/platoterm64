@@ -17,7 +17,7 @@ uint8_t CharWide = 5;
 uint8_t CharHigh = 8;
 padPt TTYLoc;
 
-#define screen ((unsigned char *)0x6000)
+#define screen ((unsigned char *)0x6200)
 #define init0 *((unsigned char *)0xff90)
 #define video *((unsigned char *)0xff98)
 #define res   *((unsigned char *)0xff99)
@@ -135,7 +135,7 @@ void screen_init(void){
     video = 0x80;
     res = 0x0c;
     vscr = 0;
-    oreg = 0xec00;
+    oreg = 0xec40;
     pal[0] = 0x00;
     pal[1] = 0xff;
     border = 0x88;

@@ -14,7 +14,7 @@ olds	rmb	2
 start
 	;; setup C stack
 	sts	olds
-	lds	#$8000
+	lds	#$6200
 	;; replace irq vector
 	orcc	#$50		; turn off both firq and irq
 	ldx	#interrupt
