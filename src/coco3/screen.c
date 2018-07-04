@@ -13,8 +13,8 @@
 
 extern padBool FastText;
 
-uint8_t CharWide = 5;
-uint8_t CharHigh = 8;
+uint8_t CharWide = 8;
+uint8_t CharHigh = 16;
 padPt TTYLoc;
 
 #define screen ((unsigned char *)0x6200)
