@@ -12,6 +12,7 @@
 	export  _ser_put_clean
 	export  _ser_open
 	export  _ser_get
+	export  _ser_close
 	export  poll
 
 ;;; input buffer
