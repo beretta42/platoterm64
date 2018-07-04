@@ -14,7 +14,7 @@ olds	rmb	2
 start
 	;; setup C stack
 	sts	olds
-	lds	#$6000
+	lds	#$8000
 	;; replace irq vector
 	orcc	#$50		; turn off both firq and irq
 	ldx	#interrupt
@@ -29,7 +29,7 @@ start
 
 interrupt:
 	lda	$ff02		; clear vsync pia
-*	jsr	_kpoll		; go poll keyboard
+	jsr	_kpoll		; go poll keyboard
 	jsr	poll		; go poll and add drivewire
 a@	rti			; return from interrupt
 
