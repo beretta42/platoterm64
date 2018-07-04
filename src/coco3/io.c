@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 #include "../io.h"
+#include "../protocol.h"
 
 void ser_open( void );
 void ser_close( void );
@@ -23,9 +24,11 @@ static uint8_t ch = 0;
  */
 void io_init(void){
     ser_open();
-    char *str = "tcp connect irata.online 8005\r\n";
+    TTY = -1;
+    /*    char *str = "tcp connect irata.online 8005\r\n";
     while (*str)
 	ser_put_clean(*str++);
+    */
 };
 
 /**
